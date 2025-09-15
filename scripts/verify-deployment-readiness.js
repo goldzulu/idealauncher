@@ -72,8 +72,8 @@ class DeploymentReadinessChecker {
       'NEXTAUTH_SECRET',
       'NEXTAUTH_URL', 
       'DATABASE_URL',
-      'AZURE_OPENAI_API_KEY',
-      'AZURE_OPENAI_ENDPOINT'
+      'AZURE_API_KEY',
+      'AZURE_ENDPOINT'
     ]
     
     requiredVars.forEach(varName => {
