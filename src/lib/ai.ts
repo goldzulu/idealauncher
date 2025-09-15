@@ -1,20 +1,28 @@
-import { createAzure } from '@ai-sdk/azure'
+import { createGoogleGenerativeAI } from '@ai-sdk/google'
 
-// Extract resource name from Azure endpoint URL
-const getResourceName = (endpoint: string) => {
-  if (!endpoint) return ''
-  try {
-    const url = new URL(endpoint)
-    return url.hostname.split('.')[0] || ''
-  } catch {
-    // Fallback for malformed URLs
-    return endpoint.replace('https://', '').replace('.cognitiveservices.azure.com/', '').split('.')[0] || ''
-  }
+// Disable AI SDK warnings
+if (typeof globalThis !== 'undefined') {
+  (globalThis as any).AI_SDK_LOG_WARNINGS = false
 }
 
-export const azure = createAzure({
-  resourceName: getResourceName(process.env.AZURE_ENDPOINT || ''),
-  apiKey: process.env.AZURE_API_KEY || '',
+// Debug Google AI configuration
+const apiKey = process.env.GEMINI_API_KEY || ''
+const modelName = 'gemini-2.0-flash-exp'
+
+console.log('Google AI Configuration:', {
+  hasApiKey: !!apiKey,
+  modelName,
+  apiKeyLength: apiKey.length
 })
 
-export const model = azure(process.env.AZURE_OPENAI_DEPLOYMENT || 'gpt-4')
+if (!apiKey) {
+  console.error('GEMINI_API_KEY is missing!')
+}
+
+// Create Google AI provider
+const google = createGoogleGenerativeAI({
+  apiKey: apiKey,
+})
+
+// Create the model
+export const model = google(modelName)

@@ -80,19 +80,26 @@ Help them brainstorm, validate, and develop their idea. Be concise but insightfu
     ]
 
     // Stream AI response
-    const result = streamText({
+    console.log('Starting AI stream with model:', model)
+    
+    const result = await streamText({
       model,
       messages: conversationHistory,
       temperature: 0.7,
       async onFinish({ text }) {
-        // Save the complete assistant message after streaming
-        await prisma.chatMessage.create({
-          data: {
-            content: text,
-            role: 'assistant',
-            ideaId: ideaId,
-          }
-        })
+        try {
+          // Save the complete assistant message after streaming
+          await prisma.chatMessage.create({
+            data: {
+              content: text,
+              role: 'assistant',
+              ideaId: ideaId,
+            }
+          })
+          console.log('Assistant message saved successfully')
+        } catch (error) {
+          console.error('Failed to save assistant message:', error)
+        }
       },
     })
 
