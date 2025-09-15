@@ -4,15 +4,6 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 import { model } from '@/lib/ai'
 import { streamText } from 'ai'
-import { z } from 'zod'
-
-const chatRequestSchema = z.object({
-  messages: z.array(z.object({
-    id: z.string(),
-    role: z.enum(['user', 'assistant', 'system']),
-    content: z.string(),
-  })),
-})
 
 export async function POST(
   request: NextRequest,
@@ -45,12 +36,30 @@ export async function POST(
     }
 
     const body = await request.json()
-    const { messages } = chatRequestSchema.parse(body)
+    console.log('Request body received:', JSON.stringify(body, null, 2))
+    
+    const { messages } = body
+
+    // Validate messages array
+    if (!messages || !Array.isArray(messages) || messages.length === 0) {
+      console.error('Invalid messages format:', { messages, type: typeof messages, isArray: Array.isArray(messages) })
+      return new Response('Invalid messages format - expected non-empty array', { status: 400 })
+    }
+
+    // Validate message format
+    for (let i = 0; i < messages.length; i++) {
+      const msg = messages[i]
+      if (!msg || typeof msg !== 'object' || !msg.role || !msg.content) {
+        console.error('Invalid message at index', i, ':', msg)
+        return new Response(`Invalid message format at index ${i} - missing role or content`, { status: 400 })
+      }
+    }
 
     // Get the latest user message
     const latestMessage = messages[messages.length - 1]
-    if (latestMessage.role !== 'user') {
-      return new Response('Invalid message format', { status: 400 })
+    if (!latestMessage || latestMessage.role !== 'user') {
+      console.error('Last message is not from user:', latestMessage)
+      return new Response('Invalid message format - last message must be from user', { status: 400 })
     }
 
     // Save user message to database
@@ -63,28 +72,44 @@ export async function POST(
     })
 
     // Prepare conversation history for AI
-    const conversationHistory = [
-      {
-        role: 'system' as const,
-        content: `You are an AI assistant helping with startup idea development. The user is working on an idea titled "${idea.title}"${idea.oneLiner ? ` with the tagline: "${idea.oneLiner}"` : ''}. 
+    const systemMessage = {
+      role: 'system' as const,
+      content: `You are an AI assistant helping with startup idea development. The user is working on an idea titled "${idea.title}"${idea.oneLiner ? ` with the tagline: "${idea.oneLiner}"` : ''}. 
 
 Current document content:
 ${idea.documentMd || 'No content yet.'}
 
 Help them brainstorm, validate, and develop their idea. Be concise but insightful. Focus on practical advice and actionable suggestions.`
-      },
-      ...messages.map(msg => ({
-        role: msg.role as 'user' | 'assistant' | 'system',
-        content: msg.content
-      }))
-    ]
+    }
 
-    // Stream AI response
+    const conversationHistory = [systemMessage, ...messages]
+
+    // Debug logging
+    console.log('Messages received:', messages.length)
+    console.log('Conversation history length:', conversationHistory.length)
     console.log('Starting AI stream with model:', model)
     
-    const result = await streamText({
+    // Validate conversationHistory before passing to AI
+    if (!conversationHistory || !Array.isArray(conversationHistory)) {
+      throw new Error('Invalid conversation history format')
+    }
+
+    // Validate each message has the correct format for AI SDK
+    const validatedMessages = conversationHistory.map((msg, index) => {
+      if (!msg.role || !msg.content) {
+        throw new Error(`Message at index ${index} missing role or content`)
+      }
+      return {
+        role: msg.role,
+        content: msg.content
+      }
+    })
+
+    console.log('Messages validated successfully:', validatedMessages.length)
+
+    const result = streamText({
       model,
-      messages: conversationHistory,
+      messages: validatedMessages,
       temperature: 0.7,
       async onFinish({ text }) {
         try {
@@ -107,14 +132,6 @@ Help them brainstorm, validate, and develop their idea. Be concise but insightfu
 
   } catch (error) {
     console.error('Chat API error:', error)
-    
-    if (error instanceof z.ZodError) {
-      return new Response(
-        JSON.stringify({ error: 'Invalid request data', details: error.errors }),
-        { status: 400, headers: { 'Content-Type': 'application/json' } }
-      )
-    }
-    
     return new Response('Internal server error', { status: 500 })
   }
 }

@@ -122,3 +122,65 @@
   pointer-events: none;
   height: 0;
 }
+
+/* AI Generated Content Styles */
+.ai-generated-content {
+  @apply border-l-4 border-blue-500 bg-blue-50 dark:bg-blue-950/20 p-4 my-4 rounded-r-lg;
+}
+
+.ai-generated-content p:first-child {
+  @apply text-blue-700 dark:text-blue-300 text-sm mb-2;
+}
+
+.ai-generated-content hr {
+  @apply border-blue-200 dark:border-blue-800 my-3;
+}
+
+.ai-insertion {
+  @apply border-l-4 border-green-500 bg-green-50 dark:bg-green-950/20 p-3 my-3 rounded-r-lg;
+  position: relative;
+}
+
+.ai-insertion::before {
+  content: "AI Generated";
+  @apply absolute -top-2 left-2 bg-green-500 text-white text-xs px-2 py-1 rounded;
+}
+
+/* Chat specific styles */
+.chat-scroll-area {
+  scrollbar-width: thin;
+  scrollbar-color: hsl(var(--muted-foreground)) transparent;
+}
+
+.chat-scroll-area::-webkit-scrollbar {
+  width: 6px;
+}
+
+.chat-scroll-area::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.chat-scroll-area::-webkit-scrollbar-thumb {
+  background-color: hsl(var(--muted-foreground));
+  border-radius: 3px;
+}
+
+.chat-scroll-area::-webkit-scrollbar-thumb:hover {
+  background-color: hsl(var(--foreground));
+}
+
+.message-bubble {
+  transition: all 0.2s ease-in-out;
+}
+
+.message-bubble:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.messages-gradient {
+  background: linear-gradient(to bottom, 
+    hsl(var(--background)) 0%, 
+    hsl(var(--muted) / 0.3) 50%, 
+    hsl(var(--background)) 100%);
+}

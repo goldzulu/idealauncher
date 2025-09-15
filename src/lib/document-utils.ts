@@ -207,23 +207,42 @@ export function formatAIContent(content: string, sourceType?: string): string {
   const timestamp = new Date().toLocaleString();
   const source = sourceType ? ` (${sourceType})` : '';
   
-  return `**AI Generated Content${source}** *(${timestamp})*
+  // Clean up the content - remove excessive line breaks and format properly
+  const cleanContent = content
+    .trim()
+    .replace(/\n{3,}/g, '\n\n') // Replace multiple line breaks with double
+    .replace(/^\s*[\r\n]/gm, '') // Remove empty lines at start
+    .trim();
+  
+  return `<div class="ai-generated-content">
+<p><strong>AI Generated Content${source}</strong> <em>(${timestamp})</em></p>
 
-${content}
+${cleanContent}
 
----`;
+<hr />
+</div>`;
 }
 
 /**
  * Global function to insert content into document (used by other components)
  */
-export function insertIntoDocument(sectionId: string, content: string, sourceType?: string): void {
-  // This function will be called by other components to insert content
-  // It uses the global window function set by DocumentEditor
-  if (typeof window !== 'undefined' && (window as any).insertIntoDocumentSection) {
-    const formattedContent = formatAIContent(content, sourceType);
-    (window as any).insertIntoDocumentSection(sectionId, formattedContent);
-  } else {
-    console.warn('Document editor not available for content insertion');
-  }
+export function insertIntoDocument(sectionId: string, content: string, sourceType?: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    // This function will be called by other components to insert content
+    // It uses the global window function set by DocumentEditor
+    if (typeof window !== 'undefined' && (window as any).insertIntoDocumentSection) {
+      try {
+        const formattedContent = formatAIContent(content, sourceType);
+        (window as any).insertIntoDocumentSection(sectionId, formattedContent);
+        resolve();
+      } catch (error) {
+        console.error('Error during content insertion:', error);
+        reject(error);
+      }
+    } else {
+      const errorMsg = 'Document editor not available for content insertion. Please ensure the document editor is loaded and active.';
+      console.warn(errorMsg);
+      reject(new Error(errorMsg));
+    }
+  });
 }

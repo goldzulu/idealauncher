@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { DocumentEditorWrapper } from '@/components/editor';
-import { ChatPanel } from '@/components/chat';
+import { ChatbotPanel } from '@/components/chat/chatbot-panel';
 import { ResearchPanel, ScorePanel, MVPPanel, ExportPanel, TechStackPanel } from '@/components/panels';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
@@ -296,7 +296,7 @@ export function IdeaWorkspace({ ideaId }: IdeaWorkspaceProps) {
       <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
         {/* Left Pane - Chat Panel */}
         <div className="w-full lg:w-1/2 border-b lg:border-b-0 lg:border-r h-1/2 lg:h-full">
-          <ChatPanel 
+          <ChatbotPanel 
             ideaId={ideaId} 
             className="h-full" 
             onMessageInsert={handleMessageInsert}

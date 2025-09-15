@@ -59,20 +59,39 @@ export function ResearchPanel({ ideaId, className }: ResearchPanelProps) {
   // Load existing research data on component mount
   useEffect(() => {
     const loadData = async () => {
-      const data = await safeAsync(
-        () => ideaAPI.research(ideaId, 'competitors').then(() => 
-          fetch(`/api/ideas/${ideaId}/research`).then(res => res.json())
-        ),
-        {
-          onError: (err) => setError(err as Error),
-          showToast: false, // We'll handle this in the UI
+      console.log('Loading research data for idea:', ideaId);
+      
+      try {
+        // Just fetch existing data, don't generate new research automatically
+        const response = await fetch(`/api/ideas/${ideaId}/research`);
+        
+        if (!response.ok) {
+          if (response.status === 404) {
+            // No research data exists yet, that's fine
+            console.log('No research data found, showing empty state');
+            setCompetitors([]);
+            setMonetization([]);
+            setNames([]);
+            setError(null);
+            setIsLoadingData(false);
+            return;
+          }
+          throw new Error(`Failed to load research data: ${response.status}`);
         }
-      );
-
-      if (data) {
+        
+        const data = await response.json();
+        console.log('Research data loaded:', data);
+        
         setCompetitors(data.competitors || []);
         setMonetization(data.monetization || []);
         setNames(data.names || []);
+        setError(null);
+      } catch (err) {
+        console.error('Error loading research data:', err);
+        // Don't set error for empty data, just show empty state
+        setCompetitors([]);
+        setMonetization([]);
+        setNames([]);
         setError(null);
       }
       

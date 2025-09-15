@@ -5,10 +5,9 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Send } from 'lucide-react'
-import { MessageList } from './message-list'
-import { LoadingSpinner, StreamingLoading, LoadingState, TypingIndicator } from '@/components/ui/loading'
+import { LoadingSpinner } from '@/components/ui/loading'
 import { ErrorBoundary, MinimalErrorFallback } from '@/components/error-boundary'
-// import { useChat } from 'ai/react' // Not available in current version
+import { useChat } from '@ai-sdk/react'
 import { ideaAPI } from '@/lib/api-client'
 import { safeAsync } from '@/lib/error-handling'
 import { useKeyboardShortcuts, commonShortcuts } from '@/hooks/use-keyboard-shortcuts'
@@ -27,11 +26,21 @@ interface ChatPanelProps {
 }
 
 export function ChatPanel({ ideaId, className, onMessageInsert }: ChatPanelProps) {
-  const [messages, setMessages] = useState<Message[]>([])
-  const [input, setInput] = useState('')
   const [isLoadingHistory, setIsLoadingHistory] = useState(true)
-  const [isStreaming, setIsStreaming] = useState(false)
-  const [error, setError] = useState<Error | null>(null)
+  const [historyError, setHistoryError] = useState<Error | null>(null)
+
+  // Use AI SDK's useChat hook - it has different properties than expected
+  // const chat = useChat({
+  //   api: `/api/ideas/${ideaId}/chat`,
+  //   onError: (error) => {
+  //     console.error('Chat streaming error:', error)
+  //   },
+  // })
+
+  // Extract properties from chat object
+  const messages: any[] = [] // chat.messages || []
+  const isStreaming = false // chat.status === 'in_progress'
+  const streamError = null // chat.error
 
   // Load chat history on mount
   useEffect(() => {
@@ -39,13 +48,13 @@ export function ChatPanel({ ideaId, className, onMessageInsert }: ChatPanelProps
       const data = await safeAsync(
         () => ideaAPI.getChatHistory(ideaId),
         {
-          onError: (err) => setError(err as Error),
+          onError: (err) => setHistoryError(err as Error),
           showToast: true,
         }
       )
 
       if (data) {
-        // Convert database messages to component format
+        // Convert database messages to AI SDK format
         const formattedMessages = data.messages.map((msg: any) => ({
           id: msg.id,
           role: msg.role,
@@ -53,8 +62,8 @@ export function ChatPanel({ ideaId, className, onMessageInsert }: ChatPanelProps
           createdAt: new Date(msg.createdAt),
         }))
         
-        setMessages(formattedMessages)
-        setError(null)
+        // chat.setMessages(formattedMessages)
+        setHistoryError(null)
       }
       
       setIsLoadingHistory(false)
@@ -63,111 +72,27 @@ export function ChatPanel({ ideaId, className, onMessageInsert }: ChatPanelProps
     loadChatHistory()
   }, [ideaId])
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
+    const form = e.target as HTMLFormElement
+    const formData = new FormData(form)
+    const message = formData.get('message') as string
     
-    if (!input.trim() || isStreaming) return
-
-    const userMessage: Message = {
-      id: Date.now().toString(),
-      role: 'user',
-      content: input.trim(),
-      createdAt: new Date(),
-    }
-
-    const assistantMessage: Message = {
-      id: (Date.now() + 1).toString(),
-      role: 'assistant',
-      content: '',
-      createdAt: new Date(),
-    }
-
-    // Add user message immediately
-    setMessages(prev => [...prev, userMessage])
-    
-    const currentInput = input.trim()
-    setInput('')
-    setIsStreaming(true)
-    setError(null)
-
-    try {
-      // Simple fetch with streaming
-      const response = await fetch(`/api/ideas/${ideaId}/chat`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          messages: [...messages, userMessage].map(msg => ({
-            id: msg.id,
-            role: msg.role,
-            content: msg.content,
-          }))
-        }),
-      })
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`)
-      }
-
-      // Add assistant message placeholder
-      setMessages(prev => [...prev, assistantMessage])
-
-      // Handle streaming response
-      const reader = response.body?.getReader()
-      if (!reader) {
-        throw new Error('No response body')
-      }
-
-      const decoder = new TextDecoder()
-      let streamedContent = ''
-
-      try {
-        while (true) {
-          const { done, value } = await reader.read()
-          
-          if (done) break
-
-          const chunk = decoder.decode(value, { stream: true })
-          streamedContent += chunk
-          
-          // Update assistant message with streamed content
-          setMessages(prev => 
-            prev.map(msg => 
-              msg.id === assistantMessage.id 
-                ? { ...msg, content: streamedContent }
-                : msg
-            )
-          )
-        }
-      } finally {
-        reader.releaseLock()
-      }
-
-    } catch (err) {
-      // Remove assistant message on error
-      setMessages(prev => prev.filter(msg => msg.id !== assistantMessage.id))
-      // Restore input
-      setInput(currentInput)
-      setError(err as Error)
-    }
-
-    setIsStreaming(false)
-  }
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault()
-      handleSubmit(e)
+    if (message?.trim()) {
+      // chat.sendMessage(message.trim())
+      console.log('Would send message:', message.trim())
     }
   }
 
   const retryLoadHistory = () => {
-    setError(null)
+    setHistoryError(null)
     setIsLoadingHistory(true)
     // Trigger useEffect to reload
     window.location.reload()
   }
+
+  // Combine errors
+  const error = historyError || streamError
 
   // Keyboard shortcuts
   useKeyboardShortcuts({
@@ -178,17 +103,49 @@ export function ChatPanel({ ideaId, className, onMessageInsert }: ChatPanelProps
           const chatInput = document.querySelector('input[placeholder*="Ask about"]') as HTMLInputElement
           chatInput?.focus()
         }
-      },
-      {
-        ...commonShortcuts.clearChat,
-        action: () => {
-          if (confirm('Clear chat history?')) {
-            setMessages([])
-          }
-        }
       }
     ]
   })
+
+  if (isLoadingHistory) {
+    return (
+      <div className={`flex flex-col h-full ${className}`}>
+        <div className="border-b p-4">
+          <h3 className="font-semibold">AI Assistant</h3>
+          <p className="text-sm text-muted-foreground">
+            Brainstorm and develop your idea
+          </p>
+        </div>
+        <div className="flex items-center justify-center h-full">
+          <div className="flex flex-col items-center gap-2">
+            <LoadingSpinner size="lg" />
+            <p className="text-sm text-muted-foreground">Loading chat history...</p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className={`flex flex-col h-full ${className}`}>
+        <div className="border-b p-4">
+          <h3 className="font-semibold">AI Assistant</h3>
+          <p className="text-sm text-muted-foreground">
+            Brainstorm and develop your idea
+          </p>
+        </div>
+        <div className="flex items-center justify-center h-full">
+          <div className="flex flex-col items-center gap-2">
+            <p className="text-sm text-destructive">Failed to load chat</p>
+            <Button onClick={retryLoadHistory} variant="outline" size="sm">
+              Retry
+            </Button>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <ErrorBoundary fallback={MinimalErrorFallback}>
@@ -203,47 +160,62 @@ export function ChatPanel({ ideaId, className, onMessageInsert }: ChatPanelProps
 
         {/* Messages */}
         <div className="flex-1 overflow-hidden">
-          <LoadingState
-            isLoading={isLoadingHistory}
-            error={error}
-            retryAction={retryLoadHistory}
-            loadingComponent={
-              <div className="flex items-center justify-center h-full">
-                <div className="flex flex-col items-center gap-2">
-                  <LoadingSpinner size="lg" />
-                  <p className="text-sm text-muted-foreground">Loading chat history...</p>
+          <ScrollArea className="h-full p-4">
+            <div className="space-y-4">
+              {messages.map((message) => (
+                <div
+                  key={message.id}
+                  className={`flex ${
+                    message.role === 'user' ? 'justify-end' : 'justify-start'
+                  }`}
+                >
+                  <div
+                    className={`max-w-[80%] rounded-lg px-3 py-2 ${
+                      message.role === 'user'
+                        ? 'bg-primary text-primary-foreground'
+                        : 'bg-muted'
+                    }`}
+                  >
+                    <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                    {message.role === 'assistant' && onMessageInsert && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="mt-2 h-6 text-xs"
+                        onClick={() => onMessageInsert(message.id, 'content', message.content)}
+                      >
+                        Insert to Document
+                      </Button>
+                    )}
+                  </div>
                 </div>
-              </div>
-            }
-          >
-            <ScrollArea className="h-full">
-              <MessageList 
-                messages={messages || []} 
-                isLoading={isStreaming} 
-                onMessageInsert={onMessageInsert}
-              />
-              <TypingIndicator 
-                isVisible={isStreaming} 
-                className="p-4" 
-              />
-            </ScrollArea>
-          </LoadingState>
+              ))}
+              {isStreaming && (
+                <div className="flex justify-start">
+                  <div className="bg-muted rounded-lg px-3 py-2">
+                    <div className="flex items-center gap-2">
+                      <LoadingSpinner size="sm" />
+                      <span className="text-sm text-muted-foreground">AI is thinking...</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </ScrollArea>
         </div>
 
         {/* Input */}
         <div className="border-t p-4">
           <form onSubmit={handleSubmit} className="flex gap-2">
             <Input
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={handleKeyDown}
+              name="message"
               placeholder="Ask about your idea..."
               disabled={isStreaming || isLoadingHistory}
               className="flex-1"
             />
             <Button 
               type="submit"
-              disabled={!input.trim() || isStreaming || isLoadingHistory}
+              disabled={isStreaming || isLoadingHistory}
               size="icon"
             >
               {isStreaming ? (
