@@ -46,19 +46,22 @@ jobs:
     - name: Success
       run: echo "✅ All quality checks passed! Ready for deployment."
 
-  deploy:
+  deployment-ready:
     runs-on: ubuntu-latest
     needs: quality-checks
     if: github.ref == 'refs/heads/main'
     
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      
-    - name: Deploy to Vercel
-      uses: amondnet/vercel-action@v25
-      with:
-        vercel-token: ${{ secrets.VERCEL_TOKEN }}
-        vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
-        vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
-        vercel-args: '--prod'
+    - name: Deployment Instructions
+      run: |
+        echo "🎉 All quality checks passed! Your code is ready for deployment."
+        echo ""
+        echo "To deploy to Vercel:"
+        echo "1. Install Vercel CLI: npm i -g vercel"
+        echo "2. Login to Vercel: vercel login"
+        echo "3. Deploy: vercel --prod"
+        echo ""
+        echo "Or set up automatic deployment by adding these GitHub secrets:"
+        echo "- VERCEL_TOKEN (from https://vercel.com/account/tokens)"
+        echo "- VERCEL_ORG_ID (from Vercel project settings)"
+        echo "- VERCEL_PROJECT_ID (from Vercel project settings)"
