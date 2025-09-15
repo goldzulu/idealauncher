@@ -274,7 +274,7 @@ export function DocumentEditor({
     } catch (error) {
       console.warn('Failed to save AI insertion version:', error);
     }
-  }, [editor, ideaId]);
+  }, [editor, ideaId, findSectionPosition]);
 
   // Expose insertIntoSection method and debugging functions
   useEffect(() => {

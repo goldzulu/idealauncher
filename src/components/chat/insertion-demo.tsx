@@ -209,7 +209,7 @@ This approach will improve efficiency by **40-60%** based on initial testing.`)
                 <h4 className="font-medium text-yellow-800 mb-2">Troubleshooting</h4>
                 <ul className="text-sm text-yellow-700 space-y-1">
                   <li>• Make sure the Document Editor component is loaded on the page</li>
-                  <li>• Check that you're on a page with an active document editor</li>
+                  <li>• Check that you&apos;re on a page with an active document editor</li>
                   <li>• Try refreshing the page if the editor was recently loaded</li>
                   <li>• Check the browser console for any JavaScript errors</li>
                 </ul>

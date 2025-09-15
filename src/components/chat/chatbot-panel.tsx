@@ -77,16 +77,13 @@ export function ChatbotPanel({ ideaId, className, onMessageInsert }: ChatbotPane
   }, [messages.length, isLoadingHistory])
 
   // Load more messages when scrolling to top (throttled for performance)
-  const handleScroll = useCallback(
-    throttle((event: React.UIEvent<HTMLDivElement>) => {
-      const { scrollTop } = event.currentTarget
-      if (scrollTop === 0 && messages.length > visibleMessageCount) {
-        const batchSize = chatPerformanceMonitor.getOptimalBatchSize(visibleMessageCount, messages.length)
-        setVisibleMessageCount(prev => Math.min(prev + batchSize, messages.length))
-      }
-    }, 100),
-    [messages.length, visibleMessageCount]
-  )
+  const handleScroll = useCallback((event: React.UIEvent<HTMLDivElement>) => {
+    const { scrollTop } = event.currentTarget
+    if (scrollTop === 0 && messages.length > visibleMessageCount) {
+      const batchSize = chatPerformanceMonitor.getOptimalBatchSize(visibleMessageCount, messages.length)
+      setVisibleMessageCount(prev => Math.min(prev + batchSize, messages.length))
+    }
+  }, [messages.length, visibleMessageCount])
 
   // Enhanced message actions with feedback integration
   const handleMessageInsert = useCallback((messageId: string, sectionId: string, content: string) => {
