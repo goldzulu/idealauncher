@@ -98,16 +98,51 @@ export function ChatPanel({ ideaId, className, onMessageInsert }: ChatPanelProps
     setError(null)
     setStreamingProgress(0)
 
-    // Handle streaming
+    // Handle streaming with proper callbacks
     try {
+      let streamedContent = ''
+      
       await ideaAPI.chat(ideaId, [...(messages || []), userMessage].map(msg => ({
         id: msg.id,
         role: msg.role,
         content: msg.content,
-      })))
-      
-      setStreamingProgress(100)
-      setTimeout(() => setStreamingProgress(0), 500)
+      })), {
+        onChunk: (chunk: string) => {
+          streamedContent += chunk
+          // Update the assistant message with streamed content
+          updateMessages(current => 
+            (current || []).map(msg => 
+              msg.id === assistantMessage.id 
+                ? { ...msg, content: streamedContent }
+                : msg
+            )
+          )
+          setStreamingProgress(Math.min(streamedContent.length / 10, 100))
+        },
+        onComplete: (fullText: string) => {
+          // Final update with complete text
+          updateMessages(current => 
+            (current || []).map(msg => 
+              msg.id === assistantMessage.id 
+                ? { ...msg, content: fullText }
+                : msg
+            )
+          )
+          setStreamingProgress(100)
+          setTimeout(() => setStreamingProgress(0), 500)
+        },
+        onError: (err: Error) => {
+          // Revert optimistic updates
+          updateMessages(current => 
+            (current || []).filter(msg => 
+              msg.id !== userMessage.id && msg.id !== assistantMessage.id
+            )
+          )
+          // Restore input
+          setInput(currentInput)
+          setError(err)
+        }
+      })
     } catch (err) {
       // Revert optimistic updates
       updateMessages(current => 

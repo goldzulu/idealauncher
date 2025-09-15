@@ -309,11 +309,16 @@ export const ideaAPI = {
     )
   },
 
-  chat: (id: string, messages: any[]) => {
+  chat: (id: string, messages: any[], streamConfig?: {
+    onChunk?: (chunk: string) => void;
+    onComplete?: (fullText: string) => void;
+    onError?: (error: Error) => void;
+  }) => {
     // Invalidate chat cache after new message
     clientCache.delete(cacheKeys.chatHistory(id))
     return apiClient.streamRequest(`/api/ideas/${id}/chat`, {
       body: { messages },
+      ...streamConfig,
     })
   },
 
