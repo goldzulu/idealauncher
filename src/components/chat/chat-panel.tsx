@@ -8,9 +8,9 @@ import { Send } from 'lucide-react'
 import { MessageList } from './message-list'
 import { LoadingSpinner, StreamingLoading, LoadingState, TypingIndicator } from '@/components/ui/loading'
 import { ErrorBoundary, MinimalErrorFallback } from '@/components/error-boundary'
+// import { useChat } from 'ai/react' // Not available in current version
 import { ideaAPI } from '@/lib/api-client'
 import { safeAsync } from '@/lib/error-handling'
-import { useOptimistic } from '@/hooks/use-optimistic-updates'
 import { useKeyboardShortcuts, commonShortcuts } from '@/hooks/use-keyboard-shortcuts'
 
 interface Message {
@@ -27,20 +27,13 @@ interface ChatPanelProps {
 }
 
 export function ChatPanel({ ideaId, className, onMessageInsert }: ChatPanelProps) {
+  const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
-  const [isLoading, setIsLoading] = useState(true)
+  const [isLoadingHistory, setIsLoadingHistory] = useState(true)
   const [isStreaming, setIsStreaming] = useState(false)
   const [error, setError] = useState<Error | null>(null)
-  const [streamingProgress, setStreamingProgress] = useState(0)
-  
-  // Use optimistic updates for messages
-  const {
-    data: messages,
-    updateOptimistic: updateMessages,
-    commitUpdate: commitMessageUpdate
-  } = useOptimistic<Message[]>([])
 
-  // Load chat history on mount with caching
+  // Load chat history on mount
   useEffect(() => {
     const loadChatHistory = async () => {
       const data = await safeAsync(
@@ -60,15 +53,15 @@ export function ChatPanel({ ideaId, className, onMessageInsert }: ChatPanelProps
           createdAt: new Date(msg.createdAt),
         }))
         
-        updateMessages(() => formattedMessages)
+        setMessages(formattedMessages)
         setError(null)
       }
       
-      setIsLoading(false)
+      setIsLoadingHistory(false)
     }
 
     loadChatHistory()
-  }, [ideaId, updateMessages])
+  }, [ideaId])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -89,67 +82,71 @@ export function ChatPanel({ ideaId, className, onMessageInsert }: ChatPanelProps
       createdAt: new Date(),
     }
 
-    // Optimistically add both messages
-    updateMessages(current => [...(current || []), userMessage, assistantMessage])
+    // Add user message immediately
+    setMessages(prev => [...prev, userMessage])
     
     const currentInput = input.trim()
     setInput('')
     setIsStreaming(true)
     setError(null)
-    setStreamingProgress(0)
 
-    // Handle streaming with proper callbacks
     try {
+      // Simple fetch with streaming
+      const response = await fetch(`/api/ideas/${ideaId}/chat`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          messages: [...messages, userMessage].map(msg => ({
+            id: msg.id,
+            role: msg.role,
+            content: msg.content,
+          }))
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+      }
+
+      // Add assistant message placeholder
+      setMessages(prev => [...prev, assistantMessage])
+
+      // Handle streaming response
+      const reader = response.body?.getReader()
+      if (!reader) {
+        throw new Error('No response body')
+      }
+
+      const decoder = new TextDecoder()
       let streamedContent = ''
-      
-      await ideaAPI.chat(ideaId, [...(messages || []), userMessage].map(msg => ({
-        id: msg.id,
-        role: msg.role,
-        content: msg.content,
-      })), {
-        onChunk: (chunk: string) => {
+
+      try {
+        while (true) {
+          const { done, value } = await reader.read()
+          
+          if (done) break
+
+          const chunk = decoder.decode(value, { stream: true })
           streamedContent += chunk
-          // Update the assistant message with streamed content
-          updateMessages(current => 
-            (current || []).map(msg => 
+          
+          // Update assistant message with streamed content
+          setMessages(prev => 
+            prev.map(msg => 
               msg.id === assistantMessage.id 
                 ? { ...msg, content: streamedContent }
                 : msg
             )
           )
-          setStreamingProgress(Math.min(streamedContent.length / 10, 100))
-        },
-        onComplete: (fullText: string) => {
-          // Final update with complete text
-          updateMessages(current => 
-            (current || []).map(msg => 
-              msg.id === assistantMessage.id 
-                ? { ...msg, content: fullText }
-                : msg
-            )
-          )
-          setStreamingProgress(100)
-          setTimeout(() => setStreamingProgress(0), 500)
-        },
-        onError: (err: Error) => {
-          // Revert optimistic updates
-          updateMessages(current => 
-            (current || []).filter(msg => 
-              msg.id !== userMessage.id && msg.id !== assistantMessage.id
-            )
-          )
-          // Restore input
-          setInput(currentInput)
-          setError(err)
         }
-      })
+      } finally {
+        reader.releaseLock()
+      }
+
     } catch (err) {
-      // Revert optimistic updates
-      updateMessages(current => 
-        (current || []).filter(msg => 
-          msg.id !== userMessage.id && msg.id !== assistantMessage.id
-        )
-      )
+      // Remove assistant message on error
+      setMessages(prev => prev.filter(msg => msg.id !== assistantMessage.id))
       // Restore input
       setInput(currentInput)
       setError(err as Error)
@@ -167,7 +164,7 @@ export function ChatPanel({ ideaId, className, onMessageInsert }: ChatPanelProps
 
   const retryLoadHistory = () => {
     setError(null)
-    setIsLoading(true)
+    setIsLoadingHistory(true)
     // Trigger useEffect to reload
     window.location.reload()
   }
@@ -186,7 +183,7 @@ export function ChatPanel({ ideaId, className, onMessageInsert }: ChatPanelProps
         ...commonShortcuts.clearChat,
         action: () => {
           if (confirm('Clear chat history?')) {
-            updateMessages(() => [])
+            setMessages([])
           }
         }
       }
@@ -207,7 +204,7 @@ export function ChatPanel({ ideaId, className, onMessageInsert }: ChatPanelProps
         {/* Messages */}
         <div className="flex-1 overflow-hidden">
           <LoadingState
-            isLoading={isLoading}
+            isLoading={isLoadingHistory}
             error={error}
             retryAction={retryLoadHistory}
             loadingComponent={
@@ -229,16 +226,6 @@ export function ChatPanel({ ideaId, className, onMessageInsert }: ChatPanelProps
                 isVisible={isStreaming} 
                 className="p-4" 
               />
-              {isStreaming && streamingProgress > 0 && (
-                <div className="px-4 pb-2">
-                  <div className="w-full h-1 bg-muted rounded-full overflow-hidden">
-                    <div 
-                      className="h-full bg-primary transition-all duration-300 ease-out"
-                      style={{ width: `${streamingProgress}%` }}
-                    />
-                  </div>
-                </div>
-              )}
             </ScrollArea>
           </LoadingState>
         </div>
@@ -251,12 +238,12 @@ export function ChatPanel({ ideaId, className, onMessageInsert }: ChatPanelProps
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder="Ask about your idea..."
-              disabled={isStreaming || isLoading}
+              disabled={isStreaming || isLoadingHistory}
               className="flex-1"
             />
             <Button 
               type="submit"
-              disabled={!input.trim() || isStreaming || isLoading}
+              disabled={!input.trim() || isStreaming || isLoadingHistory}
               size="icon"
             >
               {isStreaming ? (

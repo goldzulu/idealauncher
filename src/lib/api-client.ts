@@ -197,10 +197,27 @@ class APIClient {
           }
 
           const chunk = decoder.decode(value, { stream: true })
-          fullText += chunk
           
-          if (onChunk) {
-            onChunk(chunk)
+          // Handle AI SDK streaming format (may include data: prefixes)
+          const lines = chunk.split('\n')
+          for (const line of lines) {
+            if (line.trim()) {
+              let content = line
+              
+              // Handle Server-Sent Events format
+              if (line.startsWith('data: ')) {
+                content = line.slice(6) // Remove 'data: ' prefix
+              }
+              
+              // Skip empty lines and special SSE messages
+              if (content && content !== '[DONE]' && !content.startsWith('event:')) {
+                fullText += content
+                
+                if (onChunk) {
+                  onChunk(content)
+                }
+              }
+            }
           }
         }
 
