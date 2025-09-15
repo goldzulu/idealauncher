@@ -29,8 +29,8 @@ jobs:
     - name: Run linting
       run: npm run lint
 
-    - name: Run working tests
-      run: npx vitest run src/test/unit/utils.test.ts src/test/integration/validation.test.ts
+    - name: Run basic validation tests
+      run: npm run test:ci
 
     - name: Build check
       env:
@@ -39,7 +39,7 @@ jobs:
       run: npm run build
 
     - name: Success
-      run: echo "✅ All quality checks passed!"
+      run: echo "✅ All quality checks passed! Ready for deployment."
 
   deploy:
     runs-on: ubuntu-latest
@@ -47,6 +47,9 @@ jobs:
     if: github.ref == 'refs/heads/main'
     
     steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
     - name: Deploy to Vercel
       uses: amondnet/vercel-action@v25
       with:
