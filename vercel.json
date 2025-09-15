@@ -1,0 +1,30 @@
+{
+  "buildCommand": "npm run build",
+  "outputDirectory": ".next",
+  "framework": "nextjs",
+  "installCommand": "npm ci",
+  "devCommand": "npm run dev",
+  "env": {
+    "NEXTAUTH_SECRET": "@nextauth-secret",
+    "NEXTAUTH_URL": "@nextauth-url",
+    "DATABASE_URL": "@database-url",
+    "AZURE_OPENAI_API_KEY": "@azure-openai-api-key",
+    "AZURE_OPENAI_ENDPOINT": "@azure-openai-endpoint",
+    "DOMAINR_API_KEY": "@domainr-api-key"
+  },
+  "build": {
+    "env": {
+      "NEXTAUTH_SECRET": "@nextauth-secret",
+      "DATABASE_URL": "@database-url"
+    }
+  },
+  "functions": {
+    "src/app/api/**/*.ts": {
+      "maxDuration": 30
+    }
+  },
+  "regions": ["iad1"],
+  "github": {
+    "autoAlias": false
+  }
+}

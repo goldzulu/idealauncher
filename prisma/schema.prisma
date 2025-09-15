@@ -1,0 +1,196 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String   @id @default(cuid())
+  email         String   @unique
+  name          String?
+  image         String?
+  password      String?  // For credentials auth
+  emailVerified DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  // Relations
+  ideas         Idea[]
+  sessions      Session[]
+  accounts      Account[]
+}
+
+model Idea {
+  id            String   @id @default(cuid())
+  title         String
+  oneLiner      String?
+  documentMd    String   @default("")
+  
+  // Computed scores for sorting
+  iceScore      Float?   
+  riceScore     Float?
+  
+  // Metadata
+  phase         String   @default("ideation") // ideation, validation, scoring, mvp, export
+  isArchived    Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  // Relations
+  ownerId       String
+  owner         User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  chatMessages  ChatMessage[]
+  research      ResearchFinding[]
+  features      Feature[]
+  scores        Score[]
+  exports       SpecExport[]
+  versions      DocumentVersion[]
+  
+  @@index([ownerId, updatedAt])
+  @@index([ownerId, iceScore])
+  @@index([ownerId, riceScore])
+  @@index([ownerId, phase])
+  @@index([ownerId, isArchived, updatedAt])
+}
+
+model DocumentVersion {
+  id        String   @id @default(cuid())
+  content   String   // Document content at this version
+  changeType String  @default("manual") // 'manual' | 'ai_insert' | 'auto_save'
+  summary   String?  // Brief description of changes
+  createdAt DateTime @default(now())
+  
+  // Relations
+  ideaId    String
+  idea      Idea     @relation(fields: [ideaId], references: [id], onDelete: Cascade)
+  
+  @@index([ideaId, createdAt])
+}
+
+model ChatMessage {
+  id        String   @id @default(cuid())
+  content   String
+  role      String   // 'user' | 'assistant'
+  metadata  Json?    // Additional context, sources, etc.
+  createdAt DateTime @default(now())
+  
+  // Relations
+  ideaId    String
+  idea      Idea     @relation(fields: [ideaId], references: [id], onDelete: Cascade)
+  
+  @@index([ideaId, createdAt])
+  @@index([ideaId, role, createdAt])
+}
+
+model ResearchFinding {
+  id        String   @id @default(cuid())
+  type      String   // 'competitor' | 'monetization' | 'naming'
+  title     String
+  content   String
+  url       String?
+  metadata  Json?    // Additional structured data
+  isInserted Boolean @default(false)
+  createdAt DateTime @default(now())
+  
+  // Relations
+  ideaId    String
+  idea      Idea     @relation(fields: [ideaId], references: [id], onDelete: Cascade)
+  
+  @@index([ideaId, type])
+}
+
+model Feature {
+  id        String   @id @default(cuid())
+  title     String
+  description String?
+  priority  String   // 'MUST' | 'SHOULD' | 'COULD'
+  estimate  String?  // 'S' | 'M' | 'L'
+  dependencies String[] // Array of feature IDs
+  createdAt DateTime @default(now())
+  
+  // Relations
+  ideaId    String
+  idea      Idea     @relation(fields: [ideaId], references: [id], onDelete: Cascade)
+  
+  @@index([ideaId, priority])
+}
+
+model Score {
+  id         String   @id @default(cuid())
+  framework  String   // 'ICE' | 'RICE'
+  
+  // ICE/RICE components (0-10 scale)
+  impact     Int
+  confidence Int
+  ease       Int?     // ICE only
+  reach      Int?     // RICE only
+  effort     Int?     // RICE only (inverse of ease)
+  
+  // Computed totals
+  total      Float
+  notes      String?
+  createdAt  DateTime @default(now())
+  
+  // Relations
+  ideaId     String
+  idea       Idea     @relation(fields: [ideaId], references: [id], onDelete: Cascade)
+  
+  @@index([ideaId, createdAt])
+}
+
+model SpecExport {
+  id        String   @id @default(cuid())
+  format    String   @default("kiro") // Export format type
+  content   String   // Generated specification
+  metadata  Json?    // Export settings, version info
+  createdAt DateTime @default(now())
+  
+  // Relations
+  ideaId    String
+  idea      Idea     @relation(fields: [ideaId], references: [id], onDelete: Cascade)
+  
+  @@index([ideaId, createdAt])
+}
+
+// NextAuth required models
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}

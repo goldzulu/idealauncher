@@ -1,0 +1,1 @@
+export { IdeaWorkspace } from './idea-workspace';
