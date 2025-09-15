@@ -169,7 +169,7 @@ export function useFieldValidation<T>(
   }, [validator])
 
   const debouncedValidate = useCallback(
-    debounce(validate, debounceMs),
+    (value: T) => debounce(validate, debounceMs)(value),
     [validate, debounceMs]
   )
 

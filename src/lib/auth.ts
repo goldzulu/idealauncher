@@ -6,7 +6,13 @@ import { prisma } from './db'
 import { compare, hash } from 'bcryptjs'
 import { Resend } from 'resend'
 
-const resend = new Resend(process.env.RESEND_API_KEY)
+// Initialize Resend only when API key is available
+const getResendClient = () => {
+  if (!process.env.RESEND_API_KEY) {
+    throw new Error('RESEND_API_KEY environment variable is not set')
+  }
+  return new Resend(process.env.RESEND_API_KEY)
+}
 
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma),
@@ -23,6 +29,7 @@ export const authOptions: NextAuthOptions = {
       from: process.env.EMAIL_FROM,
       sendVerificationRequest: async ({ identifier: email, url }) => {
         try {
+          const resend = getResendClient()
           await resend.emails.send({
             from: process.env.EMAIL_FROM!,
             to: email,

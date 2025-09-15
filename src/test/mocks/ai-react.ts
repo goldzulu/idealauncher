@@ -27,7 +27,9 @@ export const useCompletion = vi.fn(() => ({
   setInput: vi.fn(),
 }))
 
-export default {
+const aiReactMocks = {
   useChat,
   useCompletion,
 }
+
+export default aiReactMocks
